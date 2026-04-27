@@ -1,0 +1,1 @@
+web: cd backend/website && python backend.py
