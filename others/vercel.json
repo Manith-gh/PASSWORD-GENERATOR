@@ -1,22 +1,22 @@
 {
   "builds": [
     {
-      "src": "api/backend.py",
+      "src": "backend/backend.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/backend.py"
+      "dest": "backend/backend.py"
     },
     {
       "src": "/whatsapp",
-      "dest": "api/backend.py"
+      "dest": "backend/backend.py"
     },
     {
       "src": "/(.*)",
-      "dest": "api/backend.py"
+      "dest": "backend/backend.py"
     }
   ]
 }
