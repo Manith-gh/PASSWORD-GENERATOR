@@ -160,7 +160,7 @@
         <h1>🔐 Password Generator</h1>
         
         <div class="slider-group">
-            <label>Password Length: <span id="length-value">8</span></label>
+            <label>Password Length: <span id="length-value">8a</span></label>
             <input type="range" id="length" min="4" max="13" value="8">
         </div>
         
@@ -203,6 +203,11 @@
             const numbers = document.getElementById('numbers').checked;
             const symbols = document.getElementById('symbols').checked;
             
+            if (!upper && !lower && !numbers && !symbols) {
+                alert('No character types selected!');
+                return;
+            }
+
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
