@@ -1,0 +1,20 @@
+# Render Blueprint Specification
+# See https://render.com/docs/blueprints for details
+services:
+  - type: web
+    name: password-generator-web
+    env: python
+    # Select Python 3.x runtime
+    plan: free
+    # Root directory of the repository contains the 'backend' folder
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --pythonpath backend backend:app
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: TWILIO_ACCOUNT_SID
+        sync: false # Set this in the Render Dashboard
+      - key: TWILIO_AUTH_TOKEN
+        sync: false # Set this in the Render Dashboard
+      - key: TWILIO_PHONE_NUMBER
+        sync: false # Set this in the Render Dashboard

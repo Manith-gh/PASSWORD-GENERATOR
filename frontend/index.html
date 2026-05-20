@@ -160,7 +160,7 @@
         <h1>🔐 Password Generator</h1>
         
         <div class="slider-group">
-            <label>Password Length: <span id="length-value">8a</span></label>
+            <label>Password Length: <span id="length-value">8</span></label>
             <input type="range" id="length" min="4" max="13" value="8">
         </div>
         
@@ -232,7 +232,10 @@
             const strengthEl = document.getElementById('strength');
             strengthEl.textContent = 'Strength: ' + data.strength;
             strengthEl.className = 'strength ' + data.strength;
-            document.getElementById('result').style.display = 'block';
+            
+            const resultEl = document.getElementById('result');
+            resultEl.style.display = 'block';
+            resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         
         function copyPassword() {
