@@ -65,17 +65,16 @@ def generate_password(length, upper=True, lower=True, numbers=True, symbols=True
     return password, strength
 
 def get_help_message():
-    return """🔐 *Password Generator Menu*
+    return """🔐 *Password Generator Bot*
 
-Reply with a number for instant action:
-1️⃣ *Generate* secure password (16 chars)
-2️⃣ *Generate* short password (8 chars)
-3️⃣ *Generate* long password (24 chars)
-4️⃣ *Show advanced options & custom commands*
+Welcome! You can generate a fully customized secure password step-by-step:
 
-🔄 Reply with **`0`** at any time to regenerate a new password with your last settings!
+🚀 Reply with **`1`** (or type `generate`) to start the interactive custom builder!
+🔄 Reply with **`0`** to regenerate a password using your last settings!
 
-*💡 Tip:* You can still type custom commands like `generate 20` or `generate 12 upper no symbols`!"""
+*💡 Tip:* You can skip the steps by typing a direct command, e.g.:
+• `generate 20`
+• `generate 12 upper no symbols`"""
 
 def get_options_message():
     return """⚙️ Password Options:
@@ -135,39 +134,162 @@ def whatsapp_webhook():
     sender_id = request.values.get('From', 'default_user')
     resp = MessagingResponse()
 
+    # Get or initialize session state
+    if sender_id not in user_sessions:
+        user_sessions[sender_id] = {
+            'state': None,
+            'length': 16,
+            'upper': True,
+            'lower': True,
+            'numbers': True,
+            'symbols': True
+        }
+    
+    session = user_sessions[sender_id]
+    state = session.get('state')
+
+    # Allow escaping/resetting the wizard at any time
+    if incoming_msg in ['menu', 'cancel', 'exit', 'reset', 'help']:
+        session['state'] = None
+        resp.message(get_help_message())
+        return str(resp)
+
+    # 1. State Machine Handling (Step-by-step wizard)
+    if state == 'awaiting_length':
+        try:
+            val = int(incoming_msg)
+            if 4 <= val <= 128:
+                session['temp_length'] = val
+                session['state'] = 'awaiting_uppercase'
+                resp.message(
+                    f"📏 Length set to *{val}*.\n\n"
+                    f"*Step 2 of 5:* Include *Uppercase letters* (A-Z)?\n"
+                    f"1️⃣ Yes\n"
+                    f"2️⃣ No"
+                )
+            else:
+                resp.message("⚠️ Please enter a number between 4 and 128.")
+        except ValueError:
+            resp.message("⚠️ Please enter a valid number, e.g., 16.")
+        return str(resp)
+
+    elif state == 'awaiting_uppercase':
+        if incoming_msg in ['1', 'yes', 'y', 'true']:
+            session['temp_upper'] = True
+        elif incoming_msg in ['2', 'no', 'n', 'false']:
+            session['temp_upper'] = False
+        else:
+            resp.message("⚠️ Please reply *1* (Yes) or *2* (No).")
+            return str(resp)
+        
+        session['state'] = 'awaiting_lowercase'
+        resp.message(
+            f"*Step 3 of 5:* Include *Lowercase letters* (a-z)?\n"
+            f"1️⃣ Yes\n"
+            f"2️⃣ No"
+        )
+        return str(resp)
+
+    elif state == 'awaiting_lowercase':
+        if incoming_msg in ['1', 'yes', 'y', 'true']:
+            session['temp_lower'] = True
+        elif incoming_msg in ['2', 'no', 'n', 'false']:
+            session['temp_lower'] = False
+        else:
+            resp.message("⚠️ Please reply *1* (Yes) or *2* (No).")
+            return str(resp)
+        
+        session['state'] = 'awaiting_numbers'
+        resp.message(
+            f"*Step 4 of 5:* Include *Numbers* (0-9)?\n"
+            f"1️⃣ Yes\n"
+            f"2️⃣ No"
+        )
+        return str(resp)
+
+    elif state == 'awaiting_numbers':
+        if incoming_msg in ['1', 'yes', 'y', 'true']:
+            session['temp_numbers'] = True
+        elif incoming_msg in ['2', 'no', 'n', 'false']:
+            session['temp_numbers'] = False
+        else:
+            resp.message("⚠️ Please reply *1* (Yes) or *2* (No).")
+            return str(resp)
+        
+        session['state'] = 'awaiting_symbols'
+        resp.message(
+            f"*Step 5 of 5:* Include *Symbols* (!@#$)?\n"
+            f"1️⃣ Yes\n"
+            f"2️⃣ No"
+        )
+        return str(resp)
+
+    elif state == 'awaiting_symbols':
+        if incoming_msg in ['1', 'yes', 'y', 'true']:
+            session['temp_symbols'] = True
+        elif incoming_msg in ['2', 'no', 'n', 'false']:
+            session['temp_symbols'] = False
+        else:
+            resp.message("⚠️ Please reply *1* (Yes) or *2* (No).")
+            return str(resp)
+        
+        # We have all selections! Generate!
+        session['state'] = None
+        length = session['temp_length']
+        upper = session['temp_upper']
+        lower = session['temp_lower']
+        numbers = session['temp_numbers']
+        symbols = session['temp_symbols']
+        
+        # Save last successful settings (for regeneration)
+        session['length'] = length
+        session['upper'] = upper
+        session['lower'] = lower
+        session['numbers'] = numbers
+        session['symbols'] = symbols
+        
+        try:
+            pwd, _ = generate_password(length, upper, lower, numbers, symbols)
+            emoji_strength = get_emoji_strength(length, upper, lower, numbers, symbols)
+            
+            response_text = (
+                f"🎉 *Here is your customized password:*\n\n"
+                f"`{pwd}`\n\n"
+                f"📊 *Strength:* {emoji_strength} ({length} chars)\n\n"
+                f"💡 _Tip: Reply *0* to instantly generate another password with these same settings, or reply *menu* to start fresh!_"
+            )
+            resp.message(response_text)
+        except ValueError as e:
+            resp.message(f"⚠️ Error: {str(e)}\nReply *menu* to start again.")
+        return str(resp)
+
+    # 2. Main Routing (When not in the middle of step-by-step wizard)
     parts = incoming_msg.split()
     command = parts[0] if parts else 'help'
 
-    # Map quick numeric shortcuts
     is_regenerate = False
-    if command == '1':
-        command = 'generate'
-        parts = ['generate', '16']
-    elif command == '2':
-        command = 'generate'
-        parts = ['generate', '8']
-    elif command == '3':
-        command = 'generate'
-        parts = ['generate', '24']
-    elif command == '4':
-        command = 'help'
-    elif command in ['0', 'r', 'regenerate']:
-        # Retrieve last session settings if they exist
-        if sender_id in user_sessions:
-            session = user_sessions[sender_id]
-            length = session['length']
-            upper = session['upper']
-            lower = session['lower']
-            numbers = session['numbers']
-            symbols = session['symbols']
-            is_regenerate = True
-            command = 'generate_direct'
-        else:
-            # Fallback to default generate if no previous session
-            command = 'generate'
-            parts = ['generate', '16']
 
-    if command == 'generate':
+    # Start the custom generation wizard
+    if command in ['1', 'generate'] and len(parts) == 1:
+        session['state'] = 'awaiting_length'
+        resp.message(
+            f"🚀 *Let's build your custom password!*\n\n"
+            f"*Step 1 of 5:* Enter the desired *length* of your password (a number between 4 and 128):"
+        )
+        return str(resp)
+
+    elif command in ['0', 'r', 'regenerate']:
+        # Retrieve last session settings
+        length = session.get('length', 16)
+        upper = session.get('upper', True)
+        lower = session.get('lower', True)
+        numbers = session.get('numbers', True)
+        symbols = session.get('symbols', True)
+        is_regenerate = True
+        command = 'generate_direct'
+
+    elif command == 'generate':
+        # Direct parsing if they entered parameters on a single line (e.g. generate 20)
         length = 16
         upper = True
         lower = True
@@ -178,7 +300,7 @@ def whatsapp_webhook():
         if len(parts) > 1:
             try:
                 length = int(parts[1])
-                length = max(6, min(length, 64))  # Clamp between 6-64
+                length = max(4, min(length, 128))
             except ValueError:
                 pass
 
@@ -203,13 +325,11 @@ def whatsapp_webhook():
             pwd, _ = generate_password(length, upper, lower, numbers, symbols)
             
             # Save settings in session
-            user_sessions[sender_id] = {
-                'length': length,
-                'upper': upper,
-                'lower': lower,
-                'numbers': numbers,
-                'symbols': symbols
-            }
+            session['length'] = length
+            session['upper'] = upper
+            session['lower'] = lower
+            session['numbers'] = numbers
+            session['symbols'] = symbols
             
             # Build interactive response
             emoji_strength = get_emoji_strength(length, upper, lower, numbers, symbols)
@@ -224,10 +344,7 @@ def whatsapp_webhook():
         except ValueError as e:
             resp.message(f"⚠️ Error: {str(e)}\nUse 'options' command to see available parameters.")
             
-    elif command == 'help':
-        resp.message(get_help_message())
-
-    elif command == 'options':
+    elif command in ['4', 'options']:
         resp.message(get_options_message())
 
     else:
